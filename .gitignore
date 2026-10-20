@@ -1,0 +1,14 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.idea/
+build/
+dist/
+release/
+github_upload/
+logs/
+recordings/
+screenshots/
+settings.json
+selftest.txt
