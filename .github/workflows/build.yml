@@ -45,6 +45,7 @@ jobs:
         run: python -m PyInstaller wall_app.spec --noconfirm --clean --distpath release
 
       - name: Selftest the built app
+        timeout-minutes: 10
         shell: bash
         env:
           SDL_VIDEODRIVER: dummy
@@ -52,9 +53,9 @@ jobs:
           WALL_SELFTEST_OUT: ${{ github.workspace }}/selftest.txt
         run: |
           case "$RUNNER_OS" in
-            Windows) ./release/TypographyWall.exe --selftest ;;
-            macOS)   ./release/TypographyWall.app/Contents/MacOS/TypographyWall --selftest ;;
-            Linux)   xvfb-run -a ./release/TypographyWall --selftest ;;   # شاشة وهمية لشاشة البداية
+            Windows) ./release/TypographyWall.exe --selftest 2>&1 | tee console.txt ;;
+            macOS)   ./release/TypographyWall.app/Contents/MacOS/TypographyWall --selftest 2>&1 | tee console.txt ;;
+            Linux)   xvfb-run -a ./release/TypographyWall --selftest 2>&1 | tee console.txt ;;   # شاشة وهمية لشاشة البداية
           esac
           cat selftest.txt
           grep -q "SELFTEST OK" selftest.txt
@@ -67,7 +68,7 @@ jobs:
           python - <<'EOF'
           import glob, os
           home = os.path.expanduser("~")
-          for pattern in (os.path.join(os.environ.get("LOCALAPPDATA", ""), "TypographyWall", "**", "*.log"),
+          for pattern in ("console.txt", os.path.join(os.environ.get("LOCALAPPDATA", ""), "TypographyWall", "**", "*.log"),
                           home + "/Library/Application Support/TypographyWall/**/*.log",
                           home + "/.local/share/TypographyWall/**/*.log"):
               for path in glob.glob(pattern, recursive=True):

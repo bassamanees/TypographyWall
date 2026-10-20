@@ -23,7 +23,7 @@ configure()
 try:
     import pyi_splash  # noqa: E402
     pyi_splash.update_text("Starting…")
-except ImportError:
+except Exception:   # لا شاشة بداية (الماك، أو نسخة المجلد، أو تعذّر تهيئتها): الوحدة تُستورد لكنها غير مهيّأة
     pyi_splash = None
 
 
@@ -52,6 +52,8 @@ def report_crash():
         sys.stderr.write(text)
     except Exception:
         pass
+    if "--selftest" in sys.argv:
+        return          # فحص آلي بلا مستخدم: نافذة الرسالة ستنتظر للأبد
     try:
         import tkinter
         from tkinter import messagebox
