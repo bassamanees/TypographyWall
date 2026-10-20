@@ -31,7 +31,7 @@ jobs:
 
       - name: Linux libraries (OpenGL / audio / Tk for the build and selftest)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0 libegl1 libasound2 python3-tk xvfb
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libgles2 libglib2.0-0 libegl1 libasound2 python3-tk xvfb
 
       - name: Install dependencies
         run: |
