@@ -1,0 +1,53 @@
+test_all_slides_render (test_app.AppTests.test_all_slides_render) ... ok
+test_blank_text (test_app.AppTests.test_blank_text) ... ok
+test_lost_hand_releases_without_throw (test_app.AppTests.test_lost_hand_releases_without_throw) ... ok
+test_missing_hand_does_not_start_grab (test_app.AppTests.test_missing_hand_does_not_start_grab) ... ok
+test_mouse_two_hand_word_stretch (test_app.AppTests.test_mouse_two_hand_word_stretch) ... ok
+test_particle_transition_lifecycle (test_app.AppTests.test_particle_transition_lifecycle) ... ok
+test_preordered_text_uses_basic_layout (test_app.AppTests.test_preordered_text_uses_basic_layout) ... ok
+test_resize_clears_old_coordinates (test_app.AppTests.test_resize_clears_old_coordinates) ... ok
+test_stale_camera_results (test_app.AppTests.test_stale_camera_results) ... ok
+test_whole_word_layout (test_app.AppTests.test_whole_word_layout) ... ok
+test_spread_gesture_and_stale_rejection (test_app.GestureTests.test_spread_gesture_and_stale_rejection) ... ok
+test_atomic_settings_roundtrip (test_core.CoreTests.test_atomic_settings_roundtrip) ... ok
+test_exclusive_grab (test_core.CoreTests.test_exclusive_grab) ... ok
+test_gentle_release_is_zero (test_core.CoreTests.test_gentle_release_is_zero) ... ok
+test_invalid_settings (test_core.CoreTests.test_invalid_settings) ... ok
+test_one_euro_raw_derivative (test_core.CoreTests.test_one_euro_raw_derivative) ... ok
+test_physics_fps_independence (test_core.CoreTests.test_physics_fps_independence) ... ok
+test_stall_budget (test_core.CoreTests.test_stall_budget) ... ok
+test_throw_clamped (test_core.CoreTests.test_throw_clamped) ... ok
+test_velocity_constant_motion (test_core.CoreTests.test_velocity_constant_motion) ... ok
+test_video_is_readable (test_core.RecorderTests.test_video_is_readable) ... ok
+test_worker_failure_does_not_deadlock_close (test_core.RecorderTests.test_worker_failure_does_not_deadlock_close) ... ok
+test_resize_does_not_recreate_window (test_hand_only.HandOnlyTests.test_resize_does_not_recreate_window) ... ok
+test_single_detector_and_no_pose (test_hand_only.HandOnlyTests.test_single_detector_and_no_pose) ... ok
+test_tablet_is_deterministic_and_textured (test_hand_only.HandOnlyTests.test_tablet_is_deterministic_and_textured) ... ok
+test_hand_video_and_crop_modes (test_landmarkers.TasksTests.test_hand_video_and_crop_modes) ... INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+WARNING: Logging before InitGoogle() is written to STDERR
+W0000 00:00:1791976871.633107      73 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1791976871.654121      72 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1791976871.676335      74 landmark_projection_calculator.cc:81] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+W0000 00:00:1791976876.731416      79 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1791976876.751058      79 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+ok
+test_pose_video_and_mask_contract (test_landmarkers.TasksTests.test_pose_video_and_mask_contract) ... W0000 00:00:1791976879.902709      84 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1791976879.933059      85 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+ok
+test_contour_calm_attraction (test_living.MotionTests.test_contour_calm_attraction) ... ok
+test_image_open_push_closed_pull (test_living.MotionTests.test_image_open_push_closed_pull) ... ok
+test_lost_both_hands_ends_stretch (test_living.MotionTests.test_lost_both_hands_ends_stretch) ... ok
+test_open_hands_cannot_stretch (test_living.MotionTests.test_open_hands_cannot_stretch) ... ok
+test_path_arc_length (test_living.MotionTests.test_path_arc_length) ... ok
+test_ribbon_assigns_free_followers (test_living.MotionTests.test_ribbon_assigns_free_followers) ... ok
+test_slow_brush_pulls_to_path (test_living.MotionTests.test_slow_brush_pulls_to_path) ... ok
+test_still_palm_returns_to_order (test_living.MotionTests.test_still_palm_returns_to_order) ... ok
+test_stretch_and_release (test_living.MotionTests.test_stretch_and_release) ... ok
+test_waves_are_bounded_and_expire (test_living.MotionTests.test_waves_are_bounded_and_expire) ... ok
+test_ink_connector_preserves_letter_bodies (test_living.VisualTests.test_ink_connector_preserves_letter_bodies) ... ok
+test_transition_endpoints_and_budget (test_living.VisualTests.test_transition_endpoints_and_budget) ... ok
+
+----------------------------------------------------------------------
+Ran 39 tests in 17.068s
+
+OK
