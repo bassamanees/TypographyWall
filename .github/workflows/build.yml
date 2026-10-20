@@ -59,6 +59,23 @@ jobs:
           cat selftest.txt
           grep -q "SELFTEST OK" selftest.txt
 
+      - name: Show the app's error log (only when the selftest failed)
+        if: failure()
+        shell: bash
+        run: |
+          # يظهر الخطأ كتنبيه عام في صفحة التشغيل (السجل الكامل يحتاج تسجيل دخول)
+          python - <<'EOF'
+          import glob, os
+          home = os.path.expanduser("~")
+          for pattern in (os.path.join(os.environ.get("LOCALAPPDATA", ""), "TypographyWall", "**", "*.log"),
+                          home + "/Library/Application Support/TypographyWall/**/*.log",
+                          home + "/.local/share/TypographyWall/**/*.log"):
+              for path in glob.glob(pattern, recursive=True):
+                  text = open(path, encoding="utf-8", errors="replace").read()[-3500:]
+                  text = text.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+                  print(f"::error title={os.path.basename(path)}::{text}")
+          EOF
+
       - name: Package
         shell: bash
         run: |
