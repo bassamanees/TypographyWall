@@ -1,5 +1,16 @@
 # Living Typography Wall — v3
 
+## 🎬 فيديو الشرح · Explainer video
+
+[![فيديو شرح جدار التيبوغرافيا: العلبة، التركيب، الحائط، التطبيق](docs/video_thumbnail.jpg)](https://github.com/bassamanees/TypographyWall/releases/download/v1.1/TypographyWall_explainer.mp4)
+
+**[▶ شاهد الفيديو (3:33، بتعليق عربي)](https://github.com/bassamanees/TypographyWall/releases/download/v1.1/TypographyWall_explainer.mp4)**:
+علبة الكاميرا، تركيب القطع، التعليق على الحائط، جهاز العرض، ثم التطبيق خطوة بخطوة.
+
+**[⬇ تحميل التطبيق (ويندوز · ماك · لينكس)](https://github.com/bassamanees/TypographyWall/releases/latest)**: ملف واحد لكل نظام، بلا تثبيت بايثون.
+
+---
+
 Read **ابدأ_هنا.txt** for Arabic instructions and the full gesture guide.
 
 ## Run in PyCharm (Python 3.14)
