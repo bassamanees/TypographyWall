@@ -6,7 +6,7 @@ from PyInstaller.utils.hooks import collect_all
 
 ROOT = os.path.abspath(SPECPATH)
 SKIP = {"wall", "build", "dist", "venv", ".venv", "env", "__pycache__", ".git", ".idea", ".vscode",
-        "tests", "docs", "logs", "tools", "recordings", "screenshots", "release", "github_upload"}
+        "tests", "docs", "logs", "tools", "recordings", "screenshots", "release", "github_upload", "firmware"}
 
 datas, binaries, hiddenimports = [], [], []
 
@@ -35,7 +35,8 @@ for f in ("app.ico", "app_icon.png"):
 
 hiddenimports += ["wall.app", "wall.launcher", "wall.esp", "wall.userdata", "wall.tracking",
                   "wall.gestures", "wall.interaction", "wall.filters", "wall.landmarkers",
-                  "wall.arabic", "wall.config", "wall.diagnostics", "wall.audio", "wall.guide_texts",
+                  "wall.arabic", "wall.config", "wall.diagnostics", "wall.audio", "wall.guide_texts", "wall.usbcam",
+                  "serial", "serial.tools.list_ports",
                   "tkinter", "tkinter.messagebox"]
 
 MAC = sys.platform == "darwin"

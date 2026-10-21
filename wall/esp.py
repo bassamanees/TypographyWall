@@ -10,6 +10,7 @@
 import concurrent.futures
 import ipaddress
 import json
+import os
 import socket
 import threading
 import time
@@ -174,6 +175,164 @@ def validate_wifi(ssid, password):
     if password and not (8 <= len(password.encode("utf-8")) <= 63):
         return "كلمة المرور يجب أن تكون من 8 إلى 63 حرفاً (أو اتركها فارغة لشبكة مفتوحة)"
     return None
+
+
+# ----------------------------------------------------------------------
+# الاتصال المباشر: الحاسوب على شبكة الكاميرا نفسها (ESP32_CAM_NET) بلا راوتر ولا إعداد
+# ----------------------------------------------------------------------
+DIRECT_STREAM = stream_url(AP_HOST)
+
+
+def camera_reachable(timeout=1.0):
+    """هل الحاسوب متصل بشبكة الكاميرا الآن؟ (صفحة /info، أو منفذ البث مفتوح)"""
+    if probe(AP_HOST, timeout=timeout):
+        return True
+    try:
+        with socket.create_connection((AP_HOST, STREAM_PORT), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def current_wifi():
+    """اسم شبكة الواي فاي المتصل بها الحاسوب الآن (أو None)، بحسب النظام نفسه."""
+    import sys
+    if sys.platform == "win32":
+        ok, out = _run(["netsh", "wlan", "show", "interfaces"], timeout=8)
+        state, ssid = "", None
+        for line in out.splitlines():
+            key, _, val = line.partition(":")
+            key = key.strip()
+            if key == "State":
+                state = val.strip()
+            elif key == "SSID" and ssid is None:
+                ssid = val.strip()
+        return ssid if state == "connected" else None
+    if sys.platform == "darwin":
+        ok, out = _run(["networksetup", "-getairportnetwork", "en0"], timeout=8)
+        return out.split(":", 1)[1].strip() if ok and ":" in out else None
+    ok, out = _run(["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"], timeout=8)
+    for line in out.splitlines():
+        if line.startswith("yes:"):
+            return line[4:]
+    return None
+
+
+def on_camera_wifi():
+    """هل الحاسوب متصل فعلاً بشبكة الكاميرا (لا بشبكة أخرى)؟"""
+    try:
+        return (current_wifi() or "").strip() == AP_SSID
+    except Exception:
+        return False
+
+
+def _run(cmd, timeout=25):
+    import subprocess
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)     # بلا نافذة أوامر سوداء على ويندوز
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, creationflags=flags)
+        return p.returncode == 0, (p.stdout + p.stderr).strip()
+    except Exception as e:
+        return False, str(e)
+
+
+def _windows_wifi_scan(wait=4.0):
+    """
+    يطلب من ويندوز فحصاً فورياً للشبكات. بدونه قد تكون قائمته قديمة فيرفض الاتصال
+    بشبكة الكاميرا بحجة أنها «غير متاحة» رغم أنها تبث.
+    """
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class GUID(ctypes.Structure):
+            _fields_ = [("d1", ctypes.c_ulong), ("d2", ctypes.c_ushort), ("d3", ctypes.c_ushort),
+                        ("d4", ctypes.c_ubyte * 8)]
+
+        class INFO(ctypes.Structure):
+            _fields_ = [("guid", GUID), ("desc", ctypes.c_wchar * 256), ("state", ctypes.c_int)]
+
+        class LIST(ctypes.Structure):
+            _fields_ = [("n", wintypes.DWORD), ("i", wintypes.DWORD), ("info", INFO * 8)]
+
+        w = ctypes.windll.wlanapi
+        h, ver = wintypes.HANDLE(), wintypes.DWORD()
+        if w.WlanOpenHandle(2, None, ctypes.byref(ver), ctypes.byref(h)) != 0:
+            return
+        try:
+            p = ctypes.POINTER(LIST)()
+            if w.WlanEnumInterfaces(h, None, ctypes.byref(p)) == 0:
+                for k in range(min(p.contents.n, 8)):
+                    w.WlanScan(h, ctypes.byref(p.contents.info[k].guid), None, None, None)
+                w.WlanFreeMemory(p)
+        finally:
+            w.WlanCloseHandle(h, None)
+        time.sleep(wait)
+    except Exception:
+        pass
+
+
+def join_camera_wifi(ssid=AP_SSID, password=AP_PASSWORD):
+    """
+    يوصل الحاسوب بشبكة الكاميرا بأمر النظام (ويندوز netsh، ماك networksetup، لينكس nmcli).
+    يعيد (نجح، رسالة). ملاحظة: الحاسوب يترك شبكته الحالية (والإنترنت) ما دام على شبكة الكاميرا.
+    """
+    import sys
+    if sys.platform == "win32":
+        import tempfile
+        from xml.sax.saxutils import escape
+        xml = f"""<?xml version="1.0"?>
+<WLANProfile xmlns="http://www.microsoft.com/networking/WLAN/profile/v1">
+  <name>{escape(ssid)}</name>
+  <SSIDConfig><SSID><name>{escape(ssid)}</name></SSID></SSIDConfig>
+  <connectionType>ESS</connectionType><connectionMode>manual</connectionMode>
+  <MSM><security>
+    <authEncryption><authentication>WPA2PSK</authentication><encryption>AES</encryption><useOneX>false</useOneX></authEncryption>
+    <sharedKey><keyType>passPhrase</keyType><protected>false</protected><keyMaterial>{escape(password)}</keyMaterial></sharedKey>
+  </security></MSM>
+</WLANProfile>"""
+        path = os.path.join(tempfile.gettempdir(), "wall_espcam_wifi.xml")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(xml)
+        try:
+            ok, out = _run(["netsh", "wlan", "add", "profile", f"filename={path}", "user=current"])
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+        # إن كانت الشبكة محفوظة مسبقاً (لكل المستخدمين) لا يمكن استبدالها بلا صلاحيات المدير: نتصل بها كما هي
+        if not ok and "exists" not in out.lower():
+            return False, out
+        _windows_wifi_scan()
+        return _run(["netsh", "wlan", "connect", f"name={ssid}", f"ssid={ssid}"])
+    if sys.platform == "darwin":
+        ok, out = _run(["networksetup", "-listallhardwareports"])
+        dev = "en0"
+        lines = out.splitlines()
+        for i, line in enumerate(lines):
+            if "Wi-Fi" in line and i + 1 < len(lines) and lines[i + 1].startswith("Device:"):
+                dev = lines[i + 1].split(":", 1)[1].strip()
+        ok, out = _run(["networksetup", "-setairportnetwork", dev, ssid, password])
+        return ok and "Error" not in out and "Could not" not in out, out
+    return _run(["nmcli", "device", "wifi", "connect", ssid, "password", password], timeout=40)
+
+
+_last_rejoin = [0.0]
+
+
+def keep_on_camera_wifi(min_gap=6.0, still_wanted=lambda: True):
+    """
+    أثناء البث المباشر: إن ترك الحاسوب شبكة الكاميرا (ويندوز يقفز لشبكة فيها إنترنت)
+    نعيد وصله بها. لا يُستدعى أكثر من مرة كل min_gap ثانية،
+    ولا بعد إغلاق البث (still_wanted) حتى لا نسحب الحاسوب من شبكته بلا داعٍ.
+    """
+    now = time.monotonic()
+    if now - _last_rejoin[0] < min_gap or camera_reachable(timeout=0.8) or not still_wanted():
+        return False
+    _last_rejoin[0] = now
+    ok, _ = join_camera_wifi()
+    return ok
 
 
 def provision(host, ssid, password, port=CFG_PORT, timeout=8.0):

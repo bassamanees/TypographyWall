@@ -80,6 +80,7 @@ class App(InteractionMixin, RenderingMixin):
         self.calibrated = bool(saved.get("calibrated"))
         self.near_threshold = float(saved["near_threshold"]) if self.calibrated else config.NEAR_THRESHOLD
         self.word_mode = saved.get("word_mode", config.WORD_MODE)
+        self._set_sensitivity(saved.get("sensitivity", config.HAND_SENSITIVITY))
         self.trails = config.TRAILS
         self.show_help = True
         self.show_camera = False
@@ -260,8 +261,14 @@ class App(InteractionMixin, RenderingMixin):
         self.message = text
         self.message_until = time.time() + seconds
 
+    def _set_sensitivity(self, value):
+        """حساسية حركة اليد: كم تُكبَّر حركتها على الشاشة (منطقة التفاعل في وسط صورة الكاميرا)."""
+        lo, hi = config.HAND_SENSITIVITY_RANGE
+        self.sensitivity = round(min(max(float(value), lo), hi), 2)
+        config.INTERACTION_BOX = config.interaction_box(self.sensitivity)   # يقرؤها خيط التتبع في كل إطار
+
     def _save_settings(self):
-        data = {"slide": self.slide, "word_mode": self.word_mode,
+        data = {"slide": self.slide, "word_mode": self.word_mode, "sensitivity": self.sensitivity,
                 "sound": self.audio.sound, "guide": self.audio.guide}
         if self.calibrated:
             data.update(calibrated=True, near_threshold=round(self.near_threshold, 3))
@@ -359,6 +366,11 @@ class App(InteractionMixin, RenderingMixin):
                 self._guide_due = self.t + 0.5
             self._save_settings()
             self._flash("الصوت: " + ("يعمل" if self.audio.sound else "مكتوم"))
+        elif key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS, pygame.K_MINUS, pygame.K_KP_MINUS):
+            up = key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS)
+            self._set_sensitivity(self.sensitivity + (0.1 if up else -0.1))
+            self._save_settings()
+            self._flash(f"حساسية حركة اليد: {self.sensitivity:.1f}× (حركة أصغر تغطي الشاشة كلما زادت)", 2.5)
         elif key == pygame.K_g:
             self.show_grid = not self.show_grid
         elif key == pygame.K_v:

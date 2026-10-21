@@ -12,6 +12,8 @@ import mediapipe as mp
 from mediapipe.tasks.python import BaseOptions
 from mediapipe.tasks.python import vision
 
+from . import config
+
 MODELS = Path(__file__).resolve().parent.parent / 'models'
 
 
@@ -80,7 +82,8 @@ class PoseTask(_Detector):
             min_pose_detection_confidence=min_detection_confidence,
             min_pose_presence_confidence=min_detection_confidence,
             min_tracking_confidence=min_tracking_confidence,
-            output_segmentation_masks=True,
+            # القناع (ظل الجسم) يكلّف ذاكرة ووقتاً؛ لا نطلبه إلا إن كان تأثير الظل مفعّلاً
+            output_segmentation_masks=bool(getattr(config, "SILHOUETTE", False)),
         )
         self.detector = vision.PoseLandmarker.create_from_options(options)
 

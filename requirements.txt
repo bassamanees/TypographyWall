@@ -6,5 +6,6 @@ pygame-ce==2.5.8
 Pillow==12.3.0
 arabic-reshaper==3.0.1
 python-bidi==0.6.11
+pyserial==3.5   # كاميرا ESP بكابل USB
 # لتوليد الدليل الصوتي فقط (tools/make_guide.py)، لا يحتاجه التطبيق وقت التشغيل
 edge-tts==7.3.1

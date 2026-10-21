@@ -132,6 +132,8 @@ class MjpegStream:
     يعيد الاتصال تلقائياً إن انقطع البث.
     """
 
+    max_fails = 200          # ~60 ثانية بلا إطار قبل الاستسلام: وقت كافٍ لإعادة وصل الواي فاي
+
     def __init__(self, url, timeout=5.0):
         self.url = url
         self.timeout = timeout
@@ -194,6 +196,13 @@ class MjpegStream:
             except Exception:
                 pass
             if self._running:
+                if "//192.168.4.1" in self.url and self._running:
+                    # اتصال مباشر بشبكة الكاميرا: ويندوز قد يقفز لشبكة فيها إنترنت، فنعيده إليها
+                    try:
+                        from .esp import keep_on_camera_wifi
+                        keep_on_camera_wifi(still_wanted=lambda: self._running)
+                    except Exception:
+                        pass
                 time.sleep(0.5)       # إعادة الاتصال
         with self._cond:
             self._cond.notify_all()
@@ -232,7 +241,7 @@ class FrameGrabber:
             ok, frame = self.cap.read()
             if not ok:
                 fails += 1
-                if fails > 60:
+                if fails > getattr(self.cap, "max_fails", 60):
                     self.error = "انقطع بث الكاميرا"
                     with self._cond:
                         self._cond.notify_all()
@@ -301,6 +310,14 @@ class CameraTracker:
             self.grabber.stop()
             self.grabber.cap.release()
 
+    def _optional_worker(self, target, *args):
+        """رصد الجسم إضافة لليد البعيدة: إن فشل (مثلاً ذاكرة قليلة) يستمر التتبع العادي بدونه."""
+        try:
+            target(*args)
+        except Exception:
+            logging.getLogger(__name__).exception("Body tracking failed; far-hand detection disabled")
+            config.FAR_HANDS = False
+
     def _worker(self, target, *args):
         try:
             target(*args)
@@ -337,7 +354,15 @@ class CameraTracker:
             self._error = f"تعذّر تحميل MediaPipe: {e}"
             return
         is_url = isinstance(self.camera_index, str)
-        if is_url:
+        if is_url and self.camera_index.startswith("usb:"):
+            # ESP32-CAM عبر كابل USB (بلا واي فاي): "usb:COM5"
+            from .usbcam import SerialJpegStream
+            cap = SerialJpegStream(self.camera_index[4:])
+            if not cap.isOpened():
+                cap.release()
+                self._error = cap.error or f"تعذّر استقبال الصورة من الكاميرا عبر {self.camera_index[4:]}"
+                return
+        elif is_url:
             # كاميرا شبكية (ESP32-CAM): رابط بث MJPEG مثل http://192.168.1.50:81/stream
             cap = MjpegStream(self.camera_index)
             if not cap.isOpened():
@@ -363,8 +388,11 @@ class CameraTracker:
             cap.release()
             return
         self.grabber = FrameGrabber(cap)
-        for target in (self._hand_loop,):
-            t = threading.Thread(target=self._worker, args=(target, detectors), daemon=True)
+        loops = [(self._worker, self._hand_loop)]
+        if config.FAR_HANDS:
+            loops.append((self._optional_worker, self._pose_loop))
+        for runner, target in loops:
+            t = threading.Thread(target=runner, args=(target, detectors), daemon=True)
             t.start()
             self._threads.append(t)
 
@@ -372,8 +400,12 @@ class CameraTracker:
     # اليد
     # ------------------------------------------------------------------
     def _hand_loop(self, detectors):
-        """One persistent VIDEO detector; newest frame only, no pose or crop passes."""
+        """
+        كشف اليد في الصورة كاملة بأحدث إطار. وإن رفع المتلقي ذراعه ولم تُرَ يده (بعيد = يد صغيرة)
+        نقصّ مربعاً حولها بموضع الرسغ من رصد الجسم ونكشف فيه (anchored crops).
+        """
         last_id, fps, last_t = 0, 0.0, time.monotonic()
+        far_detector = None      # يُحمَّل عند أول حاجة فقط (توفير الذاكرة حين يكون المتلقي قريباً)
         with detectors.HandsTask(max_num_hands=2,
                 min_detection_confidence=config.HAND_DETECTION_CONFIDENCE,
                 min_tracking_confidence=config.HAND_TRACKING_CONFIDENCE) as detector:
@@ -404,17 +436,62 @@ class CameraTracker:
                     v = v_sign_score(pts, w, h)
                     hand_list.append((bx, by, openness, label, grip, size, v))
                     pts_all.append((pts, cx, cy, grip))
+                rois = self._far_rois(pts_all, w, h) if config.FAR_HANDS else []
+                if rois and far_detector is None:
+                    try:
+                        far_detector = detectors.HandsTask(
+                            max_num_hands=2, static_image_mode=True,
+                            min_detection_confidence=config.FAR_HAND_DETECTION_CONFIDENCE)
+                    except Exception:
+                        logging.getLogger(__name__).exception("Far-hand detector unavailable")
+                        config.FAR_HANDS = False
+                        rois = []
+                if rois:
+                    for pts, key in self._detect_in_rois(far_detector, frame, rois, w, h):
+                        openness, grip = hand_shape(pts, w, h)
+                        cx = (pts[4].x + pts[8].x) * .35 + pts[5].x * .3
+                        cy = (pts[4].y + pts[8].y) * .35 + pts[5].y * .3
+                        bx, by = map_to_box(cx, cy)
+                        size = _hand_box(pts, w, h)[2] / w
+                        hand_list.append((bx, by, openness, key, grip, size, v_sign_score(pts, w, h)))
+                        pts_all.append((pts, cx, cy, grip))
                 now = time.monotonic()
                 fps = .9 * fps + .1 / max(now-last_t, .001)
                 last_t = now
-                thumb = self._thumbnail(frame, pts_all, [], config.INTERACTION_BOX) if self.want_preview else None
+                thumb = self._thumbnail(frame, pts_all, rois, config.INTERACTION_BOX) if self.want_preview else None
                 with self._lock:
                     self._hands = {"hands": hand_list, "stamp": stamp, "fps": fps,
-                                   "frame": thumb, "ok": True, "far": False}
+                                   "frame": thumb, "ok": True, "far": bool(rois)}
+            if far_detector is not None:
+                far_detector.close()
                 # Leave CPU time for rendering; capture continues independently.
                 delay = 1.0 / config.HAND_MAX_FPS - (time.monotonic()-started)
                 if delay > 0:
                     time.sleep(delay)
+
+    def _far_rois(self, found, w, h):
+        """
+        قصاصات لليد البعيدة: لكل ذراع مرفوعة يراها رصد الجسم ولا توجد قرب رسغها يد مكتشفة.
+        حجم القصاصة من عرض الكتفين (اليد ≈ نصف عرض الكتفين) مع هامش للحركة.
+        """
+        with self._lock:
+            pose = dict(self._pose)
+        if not pose.get("person") or time.monotonic() - pose.get("stamp", 0) > 0.5:
+            return []
+        sw = pose.get("shoulder_w", 0.0)
+        if sw <= 0:
+            return []
+        size = float(np.clip(config.HAND_CROP_SCALE * 0.55 * sw * w, 56, 0.6 * min(w, h)))
+        rois = []
+        for side, arm in pose.get("arms", {}).items():
+            if not arm.get("raised") or arm.get("vis", 0) < 0.35:
+                continue
+            (wx, wy), (ix, iy) = arm["wrist"], arm["index"]
+            cx, cy = (wx + 0.6 * (ix - wx)) * w, (wy + 0.6 * (iy - wy)) * h
+            if any(math.hypot(fx * w - cx, fy * h - cy) < size * 0.8 for _, fx, fy, _ in found):
+                continue                     # اليد مكتشفة أصلاً في الصورة كاملة
+            rois.append((side, cx, cy, size))
+        return rois
 
     @staticmethod
     def _detect_in_rois(hands, img, rois, w, h):
@@ -518,7 +595,7 @@ class CameraTracker:
                     ccx, ccy = center
                     box = (ccx + (x0 - ccx) / gain, ccy + (y0 - ccy) / gain,
                            ccx + (x1 - ccx) / gain, ccy + (y1 - ccy) / gain)
-                if person and res.segmentation_mask is not None:
+                if config.SILHOUETTE and person and res.segmentation_mask is not None:
                     bx0, by0, bx1, by1 = box
                     small = warp_region(res.segmentation_mask, bx0 * w, by0 * h, (bx1 - bx0) * w,
                                         (by1 - by0) * h, mw, mh)

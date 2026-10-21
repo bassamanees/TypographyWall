@@ -33,6 +33,9 @@ def validate(data):
     if (data.get('calibrated') is True and type(threshold) in (int, float)
             and math.isfinite(threshold) and 0.05 <= threshold <= 0.6):
         result.update(calibrated=True, near_threshold=threshold)
+    sens = data.get('sensitivity')
+    if type(sens) in (int, float) and math.isfinite(sens) and 0.5 <= sens <= 4:
+        result['sensitivity'] = float(sens)
     for key in ('word_mode', 'sound', 'guide'):
         if type(data.get(key)) is bool:
             result[key] = data[key]
